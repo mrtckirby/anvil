@@ -5,20 +5,62 @@
 sed -i '/ssh-autocreate-user.sh/d' /etc/pam.d/sshd
 sed -i '/ssh-autocreate-user.sh/d' /etc/pam.d/common-auth
 sed -i '/ssh-autocreate-user.sh/d' /etc/pam.d/common-account
+sed -i '/pam_permit.so/d' /etc/pam.d/sshd
 
 # 2. Configure SSH correctly (Using only modern, stable settings)
 sed -i 's/^#\?UsePAM.*/UsePAM yes/' /etc/ssh/sshd_config
 sed -i 's/^#\?UseDNS.*/UseDNS no/' /etc/ssh/sshd_config
 
-# 3. Add the hook DIRECTLY to sshd's PAM config, BEFORE common-auth is included
-# This ensures the user is created before any authentication checks
-if ! grep -q "ssh-autocreate-user.sh" /etc/pam.d/sshd; then
-    # Insert before the first auth line (usually @include common-auth)
-    sed -i '/^@include common-auth/i auth    requisite    pam_exec.so quiet /usr/local/bin/ssh-autocreate-user.sh' /etc/pam.d/sshd
-    sed -i '/^@include common-auth/i account  requisite    pam_permit.so' /etc/pam.d/sshd
-fi
+# 3. Backup and modify PAM sshd configuration
+cp /etc/pam.d/sshd /etc/pam.d/sshd.backup
+
+# Create a new sshd PAM config with our hook at the top
+cat > /etc/pam.d/sshd << 'PAMEOF'
+# Anvil auto-registration hook - MUST run first
+auth       sufficient   pam_exec.so /usr/local/bin/ssh-autocreate-user.sh
+
+# Standard Un*x authentication
+@include common-auth
+
+# Disallow non-root logins when /etc/nologin exists
+account    required     pam_nologin.so
+
+# Disallow non-root logins when /etc/nologin exists
+account    required     pam_limits.so
+
+# Standard Un*x account phase
+@include common-account
+
+# SELinux needs to be the first session rule
+session [success=ok ignore=ignore module_unknown=ignore default=bad] pam_selinux.so close
+
+# Set up user limits from /etc/security/limits.conf
+session    required     pam_limits.so
+
+# Standard Un*x session setup and teardown
+@include common-session
+
+# Print the message of the day upon successful login
+session    optional     pam_motd.so  motd=/run/motd.dynamic
+session    optional     pam_motd.so noupdate
+
+# Print the status of the user's mailbox upon successful login
+session    optional     pam_mail.so standard noenv
+
+# Create a new session keyring
+session    optional     pam_loginuid.so
+
+# SELinux needs to intervene at login time to ensure that the process starts
+session [success=ok ignore=ignore module_unknown=ignore default=bad] pam_selinux.so open
+
+# Standard Un*x password updating
+@include common-password
+PAMEOF
 
 systemctl restart ssh
+
+echo "PAM configuration updated. Verifying..."
+grep -n "ssh-autocreate-user.sh" /etc/pam.d/sshd || echo "WARNING: Hook not found in PAM config!"
 
 # 4. Initialize the Community Directory Page
 mkdir -p /var/www/html

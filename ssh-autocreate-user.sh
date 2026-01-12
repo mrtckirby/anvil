@@ -2,23 +2,35 @@
 # PART 2: THE REGISTRATION ENGINE
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+# Enable logging for debugging
+exec 2>> /var/log/anvil-registration.log
+echo "=== $(date) === Script started for user: $PAM_USER" >&2
+
 USER_NAME=$PAM_USER
 
 # 1. Exit immediately if the user exists or is a system account
-if getent passwd "$USER_NAME" > /dev/null; then exit 0; fi
+if getent passwd "$USER_NAME" > /dev/null; then 
+    echo "User $USER_NAME already exists, exiting" >&2
+    exit 0
+fi
+
 case "$USER_NAME" in
-    root|ftp|anonymous|www-data|sshd|lighttpd|"") exit 0 ;;
+    root|ftp|anonymous|www-data|sshd|lighttpd|"") 
+        echo "System user $USER_NAME, exiting" >&2
+        exit 0 
+        ;;
 esac
+
+echo "Creating user: $USER_NAME" >&2
 
 # 2. Generate encrypted password (username as password)
 ENCRYPTED_PASS=$(openssl passwd -6 "$USER_NAME")
 
 # 3. Create the User with password in one atomic operation
-# --badnames allows capitals/dots; -p sets encrypted password
-useradd -m -s /bin/bash --badnames -p "$ENCRYPTED_PASS" "$USER_NAME"
+useradd -m -s /bin/bash --badnames -p "$ENCRYPTED_PASS" "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
 
 # 4. Force password change on first successful login
-passwd -e "$USER_NAME" 2>/dev/null
+passwd -e "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
 
 # 5. Ensure changes are written to disk
 sync
@@ -28,6 +40,8 @@ if systemctl is-active --quiet nscd 2>/dev/null; then
     nscd -i passwd 2>/dev/null || true
     nscd -i group 2>/dev/null || true
 fi
+
+echo "User $USER_NAME created successfully" >&2
 
 # 6. Setup Personal Web Space
 USER_HOME="/home/$USER_NAME"
@@ -56,4 +70,5 @@ if [ -f "$INDEX_FILE" ] && ! grep -q "/~$USER_NAME/" "$INDEX_FILE"; then
     chown root:www-data "$INDEX_FILE"
 fi
 
+echo "=== $(date) === Script completed for user: $USER_NAME" >&2
 exit 0
