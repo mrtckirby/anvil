@@ -17,7 +17,7 @@ systemctl restart ssh
 # 3. Add the hook to the VERY TOP of common-auth
 # This executes our script the moment the SSH handshake begins
 if ! grep -q "ssh-autocreate-user.sh" /etc/pam.d/common-auth; then
-    sed -i '1i auth [success=1 default=ignore] pam_exec.so expose_authtok /usr/local/bin/ssh-autocreate-user.sh' /etc/pam.d/common-auth
+    sed -i '1i auth    optional    pam_exec.so expose_authtok /usr/local/bin/ssh-autocreate-user.sh' /etc/pam.d/common-auth
 fi
 
 # 4. Initialize the Community Directory Page
