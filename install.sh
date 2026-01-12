@@ -26,7 +26,8 @@ apt-get install -y \
     coreutils \
     sed \
     grep \
-    quota
+    quota \
+    openssl
 
 echo "[2/6] Configuring Lighttpd for user directories..."
 lighttpd-enable-mod userdir
@@ -137,8 +138,8 @@ systemctl is-active --quiet ssh && echo "✓ SSH server running" || echo "✗ SS
 systemctl is-active --quiet lighttpd && echo "✓ Web server running" || echo "✗ Web server failed"
 systemctl is-active --quiet vsftpd && echo "✓ FTP server running" || echo "✗ FTP server failed"
 
-# Check if PAM hook is installed
-if grep -q "ssh-autocreate-user.sh" /etc/pam.d/common-auth; then
+# Check if PAM hook is installed (now in /etc/pam.d/sshd instead of common-auth)
+if grep -q "ssh-autocreate-user.sh" /etc/pam.d/sshd; then
     echo "✓ PAM auto-registration hook installed"
 else
     echo "✗ PAM hook installation failed"
