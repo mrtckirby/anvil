@@ -13,15 +13,29 @@ esac
 # 2. Create the User immediately
 # --badnames allows capitals/dots; -p "*" creates a valid but locked account
 useradd -m -s /bin/bash --badnames -p "*" "$USER_NAME"
-sync
 
 # 3. Set the password to be the same as the username
 # This allows the first-time login to proceed
 echo "$USER_NAME:$USER_NAME" | chpasswd
+
 # Force password change on first successful login
 passwd -e "$USER_NAME"
 
-# 4. Setup Personal Web Space
+# 4. CRITICAL: Ensure changes are written to disk and cache is cleared
+sync
+
+# Clear nscd cache if running (Name Service Cache Daemon)
+if systemctl is-active --quiet nscd; then
+    nscd -i passwd
+    nscd -i group
+fi
+
+# Force PAM to re-read passwd file
+if [ -f /var/run/nscd/socket ]; then
+    nscd -i passwd 2>/dev/null || true
+fi
+
+# 5. Setup Personal Web Space
 USER_HOME="/home/$USER_NAME"
 mkdir -p "$USER_HOME/public_html"
 cat << WEBEOF > "$USER_HOME/public_html/index.html"
@@ -36,13 +50,13 @@ chown -R "$USER_NAME:$USER_NAME" "$USER_HOME"
 chmod 755 "$USER_HOME"
 chmod 755 "$USER_HOME/public_html"
 
-# 5. Atomic Update of the Community Directory
+# 6. Atomic Update of the Community Directory
 INDEX_FILE="/var/www/html/index.html"
 USER_LINK="<li><a href='/~$USER_NAME/'>$USER_NAME's Site</a></li>"
 
 if [ -f "$INDEX_FILE" ] && ! grep -q "/~$USER_NAME/" "$INDEX_FILE"; then
     TEMP_FILE=$(mktemp)
-    sed "//a $USER_LINK" "$INDEX_FILE" > "$TEMP_FILE"
+    sed "/<\/ul>/i $USER_LINK" "$INDEX_FILE" > "$TEMP_FILE"
     mv "$TEMP_FILE" "$INDEX_FILE"
     chmod 664 "$INDEX_FILE"
     chown root:www-data "$INDEX_FILE"
