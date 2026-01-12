@@ -9,9 +9,14 @@ sed -i '/ssh-autocreate-user.sh/d' /etc/pam.d/common-account
 # 2. Configure SSH correctly (Using only modern, stable settings)
 # We ensure UsePAM is on and disable DNS lookups to speed up the script trigger
 sed -i 's/^#\?UsePAM.*/UsePAM yes/' /etc/ssh/sshd_config
-if ! grep -q "UseDNS no" /etc/ssh/sshd_config; then
-    echo "UseDNS no" >> /etc/ssh/sshd_config
+sed -i 's/^#\?UseDNS.*/UseDNS no/' /etc/ssh/sshd_config
+
+# CRITICAL: Disable SSH's user existence check before PAM runs
+# This prevents "Invalid user" rejection before account creation
+if ! grep -q "^UsePAM yes" /etc/ssh/sshd_config; then
+    echo "UsePAM yes" >> /etc/ssh/sshd_config
 fi
+
 systemctl restart ssh
 
 # 3. Add the hook to the VERY TOP of common-auth
