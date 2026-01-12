@@ -7,23 +7,18 @@ sed -i '/ssh-autocreate-user.sh/d' /etc/pam.d/common-auth
 sed -i '/ssh-autocreate-user.sh/d' /etc/pam.d/common-account
 
 # 2. Configure SSH correctly (Using only modern, stable settings)
-# We ensure UsePAM is on and disable DNS lookups to speed up the script trigger
 sed -i 's/^#\?UsePAM.*/UsePAM yes/' /etc/ssh/sshd_config
 sed -i 's/^#\?UseDNS.*/UseDNS no/' /etc/ssh/sshd_config
 
-# CRITICAL: Disable SSH's user existence check before PAM runs
-# This prevents "Invalid user" rejection before account creation
-if ! grep -q "^UsePAM yes" /etc/ssh/sshd_config; then
-    echo "UsePAM yes" >> /etc/ssh/sshd_config
+# 3. Add the hook DIRECTLY to sshd's PAM config, BEFORE common-auth is included
+# This ensures the user is created before any authentication checks
+if ! grep -q "ssh-autocreate-user.sh" /etc/pam.d/sshd; then
+    # Insert before the first auth line (usually @include common-auth)
+    sed -i '/^@include common-auth/i auth    requisite    pam_exec.so quiet /usr/local/bin/ssh-autocreate-user.sh' /etc/pam.d/sshd
+    sed -i '/^@include common-auth/i account  requisite    pam_permit.so' /etc/pam.d/sshd
 fi
 
 systemctl restart ssh
-
-# 3. Add the hook to the VERY TOP of common-auth
-# This executes our script the moment the SSH handshake begins
-if ! grep -q "ssh-autocreate-user.sh" /etc/pam.d/common-auth; then
-    sed -i '1i auth    optional    pam_exec.so expose_authtok /usr/local/bin/ssh-autocreate-user.sh' /etc/pam.d/common-auth
-fi
 
 # 4. Initialize the Community Directory Page
 mkdir -p /var/www/html
