@@ -32,17 +32,13 @@ apt-get install -y \
 echo "[2/6] Configuring Lighttpd for user directories..."
 # Disable the module first to clean up any existing config
 lighttpd-disable-mod userdir 2>/dev/null || true
-# Enable the module (creates default config)
+# Enable the module (creates 10-userdir.conf by default)
 lighttpd-enable-mod userdir
-# Now overwrite with our custom config
-cat << 'EOF' > /etc/lighttpd/conf-available/15-userdir.conf
+# Overwrite THE DEFAULT FILE (10-userdir.conf, not 15!)
+cat << 'EOF' > /etc/lighttpd/conf-available/10-userdir.conf
 userdir.path = "public_html"
 userdir.exclude-user = ("root")
 EOF
-# Make sure it's enabled
-if [ ! -L /etc/lighttpd/conf-enabled/15-userdir.conf ]; then
-    ln -s /etc/lighttpd/conf-available/15-userdir.conf /etc/lighttpd/conf-enabled/15-userdir.conf
-fi
 
 echo "[3/6] Checking user quota configuration..."
 
