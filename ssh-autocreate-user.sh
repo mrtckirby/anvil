@@ -45,10 +45,7 @@ fi
 
 echo "User account created successfully" >&2
 
-# 4. Force password change on first successful login
-passwd -e "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
-
-# 5. Ensure changes are written to disk
+# 4. Ensure changes are written to disk
 sync
 
 # Clear nscd cache if running
@@ -59,7 +56,7 @@ fi
 
 echo "User $USER_NAME created successfully" >&2
 
-# 6. Setup Personal Web Space
+# 5. Setup Personal Web Space
 USER_HOME="/home/$USER_NAME"
 mkdir -p "$USER_HOME/public_html"
 cat << WEBEOF > "$USER_HOME/public_html/index.html"
@@ -74,7 +71,7 @@ chown -R "$USER_NAME:$USER_NAME" "$USER_HOME"
 chmod 755 "$USER_HOME"
 chmod 755 "$USER_HOME/public_html"
 
-# 7. Atomic Update of the Community Directory
+# 6. Atomic Update of the Community Directory
 INDEX_FILE="/var/www/html/index.html"
 USER_LINK="<li><a href='/~$USER_NAME/'>$USER_NAME's Site</a></li>"
 
