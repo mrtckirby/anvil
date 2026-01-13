@@ -25,9 +25,25 @@ echo "Creating user: $USER_NAME" >&2
 
 # 2. Generate encrypted password (username as password)
 ENCRYPTED_PASS=$(openssl passwd -6 "$USER_NAME")
+echo "Generated encrypted password" >&2
 
 # 3. Create the User with password in one atomic operation
-useradd -m -s /bin/bash --badnames -p "$ENCRYPTED_PASS" "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
+# Check if --badnames is supported
+if useradd --help 2>&1 | grep -q -- '--badnames'; then
+    echo "Using --badnames flag" >&2
+    useradd -m -s /bin/bash --badnames -p "$ENCRYPTED_PASS" "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
+else
+    echo "Using standard useradd (no --badnames)" >&2
+    useradd -m -s /bin/bash -p "$ENCRYPTED_PASS" "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
+fi
+
+# Check if user was created successfully
+if ! getent passwd "$USER_NAME" > /dev/null; then
+    echo "ERROR: Failed to create user $USER_NAME" >&2
+    exit 1
+fi
+
+echo "User account created successfully" >&2
 
 # 4. Force password change on first successful login
 passwd -e "$USER_NAME" 2>&1 | tee -a /var/log/anvil-registration.log
