@@ -16,19 +16,14 @@ cp /etc/pam.d/sshd /etc/pam.d/sshd.backup
 
 # Create a new sshd PAM config with our hook at the top
 cat > /etc/pam.d/sshd << 'PAMEOF'
-# Anvil auto-registration hook - MUST run first
-auth       sufficient   pam_exec.so /usr/local/bin/ssh-autocreate-user.sh
+# Anvil auto-registration hook - runs BEFORE authentication
+# Uses 'optional' so it doesn't interfere with normal auth flow
+auth       optional     pam_exec.so /usr/local/bin/ssh-autocreate-user.sh
 
 # Standard Un*x authentication
 @include common-auth
 
-# Disallow non-root logins when /etc/nologin exists
-account    required     pam_nologin.so
-
-# Disallow non-root logins when /etc/nologin exists
-account    required     pam_limits.so
-
-# Standard Un*x account phase
+# Standard Un*x account and session phase
 @include common-account
 
 # SELinux needs to be the first session rule
