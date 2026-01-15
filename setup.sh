@@ -100,7 +100,7 @@ access your account.
 Your password is the same as your username.
 Change it with: passwd
 
-Your web page: http://anvil/~username/
+Your web page: http://$(hostname -I | awk '{print $1}')/~username/
 ===========================================
 EOF
 

@@ -19,7 +19,8 @@ if id "$USER_NAME" &>/dev/null; then
 fi
 
 # Validate username (alphanumeric, underscore, hyphen only)
-if ! [[ "$USER_NAME" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+# Must start with lowercase letter to avoid system user conflicts
+if ! [[ "$USER_NAME" =~ ^[a-z][a-z0-9_-]*$ ]]; then
     echo "Invalid username format: $USER_NAME" >&2
     exit 1
 fi
@@ -47,17 +48,25 @@ chage -d 0 "$USER_NAME"
 if [ -f /etc/anvil-quota-mb ]; then
     QUOTA_MB=$(cat /etc/anvil-quota-mb)
     if [ "$QUOTA_MB" -gt 0 ]; then
+        # Add 10MB buffer (10240 blocks) to soft quota limit for flexibility
         setquota -u "$USER_NAME" $((QUOTA_MB * 1024)) $((QUOTA_MB * 1024 + 10240)) 0 0 / 2>/dev/null || true
     fi
 fi
 
 # Get user's home directory
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
+if [ -z "$USER_HOME" ]; then
+    echo "Failed to get home directory for $USER_NAME" >&2
+    exit 1
+fi
 
 echo "User $USER_NAME created successfully - please reconnect to login" >&2
 
 # Create public_html directory for user's website
-mkdir -p "$USER_HOME/public_html"
+if ! mkdir -p "$USER_HOME/public_html"; then
+    echo "Failed to create public_html directory for $USER_NAME" >&2
+    exit 1
+fi
 chown "$USER_NAME:$USER_NAME" "$USER_HOME/public_html"
 chmod 755 "$USER_HOME/public_html"
 
