@@ -16,9 +16,10 @@ cp /etc/pam.d/sshd /etc/pam.d/sshd.backup
 
 # Create a new sshd PAM config with our hook at the top
 cat > /etc/pam.d/sshd << 'PAMEOF'
-# Anvil auto-registration hook - creates users AND authenticates them
-# Uses 'sufficient' so if user is created successfully, auth succeeds immediately
-auth       sufficient   pam_exec.so /usr/local/bin/ssh-autocreate-user.sh
+# Anvil auto-registration hook - creates user accounts on first login attempt
+# Uses 'optional' so it runs but doesn't interfere with authentication flow
+# Note: First login creates account (will fail), second login succeeds
+auth       optional     pam_exec.so /usr/local/bin/ssh-autocreate-user.sh
 
 # Standard Un*x authentication
 @include common-auth
@@ -85,4 +86,22 @@ pam_service_name=vsftpd
 secure_chroot_dir=/var/run/vsftpd/empty
 EOF
 mkdir -p /srv/ftp/public && chmod 755 /srv/ftp/public
+
+# 6. Create informative MOTD for new users
+cat << 'EOF' > /etc/motd
+===========================================
+Welcome to Anvil Community Server!
+
+FIRST TIME USERS:
+If this is your first login, your account
+has just been created. Please reconnect to
+access your account.
+
+Your password is the same as your username.
+Change it with: passwd
+
+Your web page: http://$(hostname -I | awk '{print $1}')/~username/
+===========================================
+EOF
+
 systemctl restart vsftpd lighttpd
